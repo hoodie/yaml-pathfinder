@@ -8,5 +8,13 @@ edition = "2018"
 
 [dependencies]
 thiserror = "1.0"
-chrono = "0.4"
 yaml-rust = "0.4"
+
+[dependencies.chrono]
+version = "0.4"
+optional = true
+
+
+[features]
+default = []
+date_parsing = ["chrono"]

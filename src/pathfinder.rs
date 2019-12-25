@@ -1,7 +1,9 @@
+#[cfg(feature = "date_parsing")]
 use chrono::prelude::*;
-#[allow(unused_imports)]
+
 use yaml_rust::{yaml::Hash as YamlHash, Yaml};
 
+#[cfg(feature = "date_parsing")]
 use crate::util::parse_dmy_date;
 
 pub use crate::error::{FieldError, FieldResult};
@@ -110,6 +112,7 @@ pub trait PathFinder {
     }
 
     /// Gets a Date in `dd.mm.YYYY` format.
+    #[cfg(feature = "date_parsing")]
     fn get_dmy(&self, path: &str) -> FieldResult<Date<Utc>> {
         self.field(path, "not a date", |x| x.as_str().and_then(parse_dmy_date))
     }

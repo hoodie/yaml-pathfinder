@@ -22,7 +22,9 @@
 use std::fs;
 use std::path::Path;
 
+#[cfg(feature = "date_parsing")]
 use chrono::prelude::*;
+
 pub use yaml_rust::Yaml;
 use yaml_rust::YamlLoader;
 
@@ -41,6 +43,7 @@ pub fn parse(file_content: &str) -> Result<Yaml, Box<dyn std::error::Error>> {
 }
 
 /// Interprets `"25.12.2016"` as date.
+#[cfg(feature = "date_parsing")]
 pub fn parse_dmy_date(date_str: &str) -> Option<Date<Utc>> {
     let date = date_str
         .split('.')
@@ -59,6 +62,7 @@ pub fn parse_dmy_date(date_str: &str) -> Option<Date<Utc>> {
 ///
 /// Takes care of the old, deprecated, stupid, `dd-dd.mm.yyyy` format, what was I thinking?
 /// This is not used in the current format.
+#[cfg(feature = "date_parsing")]
 pub fn parse_dmy_date_range(date_str: &str) -> Option<Date<Utc>> {
     let date = date_str
         .split('.')

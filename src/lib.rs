@@ -3,6 +3,9 @@ use std::{fs, path::Path};
 pub mod error;
 mod pathfinder;
 mod util;
+pub mod prelude {
+    pub use crate::{PathFinder, Yaml};
+}
 
 pub use pathfinder::PathFinder;
 
@@ -25,5 +28,11 @@ impl Yaml {
 
     pub fn parse(file_content: &str) -> Result<Yaml, Box<dyn std::error::Error>> {
         util::parse(file_content).map(Self)
+    }
+}
+
+impl PathFinder for Yaml {
+    fn data(&self) -> &yaml_rust::Yaml {
+        &self.0
     }
 }

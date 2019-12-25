@@ -157,6 +157,12 @@ pub trait PathFinder {
     }
 }
 
+impl PathFinder for yaml_rust::Yaml {
+    fn data(&self) -> &yaml_rust::Yaml {
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -27,13 +27,13 @@ pub use yaml_rust::Yaml;
 use yaml_rust::YamlLoader;
 
 /// Wrapper that opens and parses a `.yml` file.
-pub fn open(path: &Path) -> Result<Yaml, anyhow::Error> {
+pub fn open(path: &Path) -> Result<Yaml, Box<dyn std::error::Error>> {
     let file_content = fs::read_to_string(&path)?;
     parse(&file_content)
 }
 
 /// Ruby like API to yaml-rust.
-pub fn parse(file_content: &str) -> Result<Yaml, anyhow::Error> {
+pub fn parse(file_content: &str) -> Result<Yaml, Box<dyn std::error::Error>> {
     Ok(YamlLoader::load_from_str(&file_content)?
         .get(0)
         .map(ToOwned::to_owned)

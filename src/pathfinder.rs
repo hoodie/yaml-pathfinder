@@ -1,6 +1,5 @@
 use chrono::prelude::*;
 #[allow(unused_imports)]
-use log::*;
 use yaml_rust::{yaml::Hash as YamlHash, Yaml};
 
 use crate::util::parse_dmy_date;
@@ -87,7 +86,6 @@ pub trait PathFinder {
         F: FnOnce(&'a Yaml) -> Option<T>,
     {
         let res = self.get(path);
-        debug!("{}::get({:?}) -> {:?}", module_path!(), path, res);
         match res {
             None => Err(FieldError::Missing),
             Some(ref node) => match parser(node) {

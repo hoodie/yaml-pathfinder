@@ -100,7 +100,6 @@ pub trait FieldResultExt<T> {
 
 impl<T> FieldResultExt<T> for FieldResult<T> {
     fn if_missing_try<F: FnOnce() -> FieldResult<T>>(self, f: F) -> FieldResult<T> {
-        log::debug!("{:?}", self.as_ref().err());
         if let Err(FieldError::Missing) = self {
             f()
         } else {

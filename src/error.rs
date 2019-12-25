@@ -2,7 +2,6 @@
 
 use thiserror::Error;
 
-
 /// Result of validating part of a project.
 ///
 /// We have to differentiate between incomplete data (missing values) and wrong data (invalid values).
@@ -17,7 +16,7 @@ pub struct ValidationResult {
     pub validation_errors: Vec<String>,
 
     /// soft error messages (incomplete data)
-    pub missing_fields: Vec<String>
+    pub missing_fields: Vec<String>,
 }
 
 impl ValidationResult {
@@ -34,7 +33,8 @@ impl ValidationResult {
 
     pub fn validate_field<T>(&mut self, name: &str, val: FieldResult<T>) {
         if let Err(FieldError::Invalid(msg)) = val {
-            self.validation_errors.push(format!("{:?} is invalid: {}", name, msg));
+            self.validation_errors
+                .push(format!("{:?} is invalid: {}", name, msg));
         }
     }
 
@@ -50,7 +50,8 @@ impl ValidationResult {
         }
 
         if let Err(FieldError::Invalid(msg)) = val {
-            self.validation_errors.push(format!("{:?} is invalid: {}", name, msg));
+            self.validation_errors
+                .push(format!("{:?} is invalid: {}", name, msg));
         }
     }
 
@@ -69,7 +70,6 @@ impl ValidationResult {
         );
     }
 }
-
 
 #[derive(Error, Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub enum FieldError {
@@ -90,10 +90,10 @@ pub type FieldResult<T> = Result<T, FieldError>;
 
 pub trait FieldResultExt<T> {
     /// Tries an alternative only if the original is actually Missing.
-    /// 
+    ///
     /// This makes sure we don't accidentally fall back to an old spec value if the original is invalid.
     fn if_missing_try<F: FnOnce() -> FieldResult<T>>(self, f: F) -> FieldResult<T>;
-    fn invalid<'a>(&'a self) -> Option<&'a str>;
+    fn invalid(&self) -> Option<&str>;
     fn is_invalid(&self) -> bool;
     fn is_missing(&self) -> bool;
 }
@@ -116,19 +116,15 @@ impl<T> FieldResultExt<T> for FieldResult<T> {
         }
     }
 
-    fn invalid<'a>(&'a self) -> Option<&'a str> {
+    fn invalid(&self) -> Option<&str> {
         if let Err(FieldError::Invalid(msg)) = self {
             Some(msg)
         } else {
             None
         }
     }
+
     fn is_invalid(&self) -> bool {
-        if let Err(FieldError::Invalid(_msg)) = self {
-            true
-        } else {
-            false
-        }
+        self.invalid().is_some()
     }
 }
-

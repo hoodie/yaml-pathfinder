@@ -1,11 +1,11 @@
 use chrono::prelude::*;
 #[allow(unused_imports)]
 use log::*;
-use yaml_rust::{Yaml, yaml::Hash as YamlHash};
+use yaml_rust::{yaml::Hash as YamlHash, Yaml};
 
-use crate::util::{parse_dmy_date, parse_dmy_date_range};
+use crate::util::parse_dmy_date;
 
-pub use crate::error::{FieldResult, FieldError};
+pub use crate::error::{FieldError, FieldResult};
 
 /// Enables access to structured data via a simple path
 ///
@@ -13,7 +13,6 @@ pub use crate::error::{FieldResult, FieldError};
 /// but also  `users.clients.23.name`
 pub trait PathFinder {
     /// You only need to implement this.
-    //fn data(&self) -> impl PathAccessible {
     fn data(&self) -> &Yaml;
 
     /// Wrapper around `get_path()`.
@@ -21,9 +20,10 @@ pub trait PathFinder {
     /// Splits path string
     /// and replaces `Yaml::Null` and `Yaml::BadValue`.
     fn get<'a>(&'a self, paths: &str) -> Option<&'a Yaml> {
-        paths.split('|').filter_map(|path|
-            self.get_direct(self.data(), path)
-        ).nth(0)
+        paths
+            .split('|')
+            .filter_map(|path| self.get_direct(self.data(), path))
+            .nth(0)
     }
 
     /// Wrapper around `get_path()`.
@@ -32,13 +32,17 @@ pub trait PathFinder {
     /// and replaces `Yaml::Null` and `Yaml::BadValue`.
     fn get_direct<'a>(&'a self, data: &'a Yaml, path: &str) -> Option<&'a Yaml> {
         // TODO: this can be without copying
-        debug_assert!(!path.chars().any(char::is_whitespace), "paths shouldn't contain whitespaces {:?}", path);
-        let path = path.split(|p| p == '/' || p == '.')
+        debug_assert!(
+            !path.chars().any(char::is_whitespace),
+            "paths shouldn't contain whitespaces {:?}",
+            path
+        );
+        let path = path
+            .split(|p| p == '/' || p == '.')
             .filter(|k| !k.is_empty())
             .collect::<Vec<&str>>();
         match self.get_path(data, &path) {
-            Some(&Yaml::BadValue) |
-            Some(&Yaml::Null) => None,
+            Some(&Yaml::BadValue) | Some(&Yaml::Null) => None,
             content => content,
         }
     }
@@ -65,10 +69,12 @@ pub trait PathFinder {
                         } else {
                             vec.get(index).and_then(|c| self.get_path(c, remainder))
                         }
-                    } else { None }
-                },
+                    } else {
+                        None
+                    }
+                }
                 // return none, because the path is longer than the data structure
-                _ => None
+                _ => None,
             }
         } else {
             None
@@ -76,8 +82,10 @@ pub trait PathFinder {
     }
 
     /// Gets the field for a given path.
-    fn field<'a, T, F> (&'a self, path: &str, err: &str, parser: F) -> FieldResult<T>
-    where F: FnOnce(&'a Yaml) -> Option<T> {
+    fn field<'a, T, F>(&'a self, path: &str, err: &str, parser: F) -> FieldResult<T>
+    where
+        F: FnOnce(&'a Yaml) -> Option<T>,
+    {
         let res = self.get(path);
         debug!("{}::get({:?}) -> {:?}", module_path!(), path, res);
         match res {
@@ -85,7 +93,7 @@ pub trait PathFinder {
             Some(ref node) => match parser(node) {
                 None => Err(FieldError::Invalid(format!("{} ({:?})", err, node))),
                 Some(parsed) => FieldResult::Ok(parsed),
-            }
+            },
         }
     }
 
@@ -108,34 +116,28 @@ pub trait PathFinder {
         self.field(path, "not a date", |x| x.as_str().and_then(parse_dmy_date))
     }
 
-    /// Gets a Date in `dd.mm.YYYY` or `dd-dd.mm.YYYY` format.
-    fn get_dmy_legacy_range(&self, path: &str) -> FieldResult<Date<Utc>> {
-        self.field(path, "neither date nor date range", |n| {
-            n.as_str().and_then(|v| {
-                parse_dmy_date(v).or_else(|| parse_dmy_date_range(v))
-                })
-        })
-    }
-
     /// Gets a `Bool` value.
     ///
     /// **Careful** this is a bit sweeter then ordinary `YAML1.2`,
     /// this will interpret `"yes"` and `"no"` as booleans, similar to `YAML1.1`.
     /// Actually it will interpret any string but `"yes"` als `false`.
     fn get_bool(&self, path: &str) -> FieldResult<bool> {
-        self.field(path, "not a boolean", |y| y
-            .as_bool()
+        self.field(path, "not a boolean", |y| {
+            y.as_bool()
                 // allowing it to be a str: "yes" or "no"
-                .or_else(|| y
-                    .as_str()
-                        .map(|yes_or_no|
-                            match yes_or_no.to_lowercase().as_ref() {
-                                "yes" => true,
-                                //"no" => false,
-                                _ => false
+                .or_else(|| {
+                    y.as_str()
+                        .map(|yes_or_no| match yes_or_no.to_lowercase().as_ref() {
+                            "yes" => true,
+                            _ => false,
                         })
-                )
-        )
+                })
+        })
+    }
+
+    /// Gets a `Bool` value.
+    fn get_bool_strict(&self, path: &str) -> FieldResult<bool> {
+        self.field(path, "not a boolean", |y| y.as_bool())
     }
 
     /// Gets `Some(Yaml::Hash)` or `None`.
@@ -154,7 +156,6 @@ pub trait PathFinder {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -167,7 +168,7 @@ mod tests {
     impl TestProvider {
         pub fn parse(src: &str) -> Self {
             Self {
-                yaml: parse(src).unwrap()
+                yaml: parse(src).unwrap(),
             }
         }
     }
@@ -177,7 +178,6 @@ mod tests {
             &self.yaml
         }
     }
-
 
     static NO_FALLBACK_PATH: &'static str = r#"
     offer:
@@ -193,21 +193,44 @@ mod tests {
         let no_fallback = TestProvider::parse(NO_FALLBACK_PATH);
         let fallback = TestProvider::parse(FALLBACK_PATH);
 
-        assert_eq!(no_fallback.get_str("offer.date|offer_date"), FieldResult::Ok("07.11.2019"));
-        assert_eq!(fallback.get_str("offer.date|offer_date"), FieldResult::Ok("08.11.2019"));
+        assert_eq!(
+            no_fallback.get_str("offer.date|offer_date"),
+            FieldResult::Ok("07.11.2019")
+        );
 
-        assert_eq!(no_fallback.get_str("offer.date"), FieldResult::Ok("07.11.2019"));
-        assert_eq!(fallback.get_str("offer_date"), FieldResult::Ok("08.11.2019"));
+        assert_eq!(
+            fallback.get_str("offer.date|offer_date"),
+            FieldResult::Ok("08.11.2019")
+        );
 
-        assert_eq!(no_fallback.get_str("offer_date"), FieldResult::Err(FieldError::Missing));
-        assert_eq!(fallback.get_str("offer.date"), FieldResult::Err(FieldError::Missing));
+        assert_eq!(
+            no_fallback.get_str("offer.date"),
+            FieldResult::Ok("07.11.2019")
+        );
+
+        assert_eq!(
+            fallback.get_str("offer_date"),
+            FieldResult::Ok("08.11.2019")
+        );
+
+        assert_eq!(
+            no_fallback.get_str("offer_date"),
+            FieldResult::Err(FieldError::Missing)
+        );
+
+        assert_eq!(
+            fallback.get_str("offer.date"),
+            FieldResult::Err(FieldError::Missing)
+        );
     }
 
     #[test]
     #[should_panic]
     fn paths_forbid_whitespaces() {
         let fallback = TestProvider::parse(FALLBACK_PATH);
-        assert_eq!(fallback.get_str("offer.date | offer_date"), FieldResult::Ok("08.11.2019"));
+        assert_eq!(
+            fallback.get_str("offer.date | offer_date"),
+            FieldResult::Ok("08.11.2019")
+        );
     }
-
 }

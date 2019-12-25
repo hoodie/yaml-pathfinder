@@ -1,7 +1,11 @@
 #[cfg(feature = "date_parsing")]
 use chrono::prelude::*;
 
-use yaml_rust::{yaml::Hash as YamlHash, Yaml};
+use yaml_rust::{
+    yaml::Array as YamlArray,
+    yaml::Hash as YamlHash,
+    Yaml
+};
 
 #[cfg(feature = "date_parsing")]
 use crate::util::parse_dmy_date;
@@ -136,15 +140,19 @@ pub trait PathFinder {
         })
     }
 
-    /// Gets a `Bool` value.
+    /// Get as `Bool` value.
     fn get_bool_strict(&self, path: &str) -> FieldResult<bool> {
         self.field(path, "not a boolean", |y| y.as_bool())
     }
 
-    /// Gets `Some(Yaml::Hash)` or `None`.
-    //pub fn get_hash<'a>(yaml:&'a Yaml, key:&str) -> Option<&'a BTreeMap<Yaml,Yaml>> {
+    /// Get as `Yaml::Hash`
     fn get_hash<'a>(&'a self, path: &str) -> FieldResult<&'a YamlHash> {
         self.field(path, "not a hash", Yaml::as_hash)
+    }
+
+    /// Get as `Yaml::Array`
+    fn get_vec<'a>(&'a self, path: &str) -> FieldResult<&'a YamlArray> {
+        self.field(path, "not a vector", Yaml::as_vec)
     }
 
     /// Gets a `Float` value.

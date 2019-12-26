@@ -1,20 +1,18 @@
 use yaml_pathfinder::PathFinder as _;
-use yaml_pathfinder::{error::ValidationResult, open_yaml, Yaml};
-
-fn validate_event(event: &Yaml) {
-    let mut validation = ValidationResult::new();
-    validation.validate_field("name", event.get_str("name"));
-    validation.validate_field("num", event.get_int("num"));
-    validation.require_field("date", event.get_str("date"));
-    dbg!( validation);
-}
+use yaml_pathfinder::{open_yaml, validator::Validator, Yaml};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let calendar = open_yaml("./examples/events.yml")?;
 
     let events = calendar.get_vec("events").unwrap();
+    let validator = Validator::new()
+        .add_rule(|yml: &Yaml| yml.get_string("name"))
+        .add_rule(|yml: &Yaml| yml.get_int("num"))
+        .require("date")
+        .fin();
+
     for event in events.iter() {
-        validate_event(event);
+        dbg!(validator.validate(&event));
     }
 
     Ok(())

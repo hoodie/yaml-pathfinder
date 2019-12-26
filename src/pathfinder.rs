@@ -108,6 +108,13 @@ pub trait PathFinder {
         self.field(path, "not a string", Yaml::as_str)
     }
 
+    /// Gets a `&str` value.
+    ///
+    /// Same mentality as `yaml_rust`, only returns `Some`, if it's a `Yaml::String`.
+    fn get_string<'a>(&'a self, path: &str) -> FieldResult<String> {
+        self.field(path, "not a string", Yaml::as_str).map(Into::into)
+    }
+
     /// Gets an `Int` value.
     ///
     /// Same mentality as `yaml_rust`, only returns `Some`, if it's a `Yaml::Int`.

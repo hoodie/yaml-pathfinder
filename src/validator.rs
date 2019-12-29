@@ -1,5 +1,7 @@
-use crate::{error::*, PathFinder};
 use yaml_rust::Yaml;
+
+pub use crate::path::*;
+use crate::{error::*, PathFinder};
 
 pub trait Rule: Send + Sync + 'static {
     type Res: Invalidatable + Send + 'static;
@@ -23,38 +25,10 @@ fn box_rule(rule: impl Rule) -> Box<DynRule> {
     Box::new(move |cx| Box::new(rule.call(cx)))
 }
 
-pub struct Require<'a> {
-    pub name: &'a str,
-    pub path: &'a str,
-}
-
-pub trait Required {
-    fn name(&self) -> &str;
-    fn path(&self) -> &str;
-}
-
-impl Required for &str {
-    fn name(&self) -> &str {
-        self.split('|').nth(0).unwrap()
-    }
-    fn path(&self) -> &str {
-        self
-    }
-}
-
-impl Required for Require<'_> {
-    fn name(&self) -> &str {
-        self.name
-    }
-    fn path(&self) -> &str {
-        self.path
-    }
-}
-
 #[derive(Default)]
 pub struct Validator {
     rules: Vec<Box<DynRule>>,
-    required: Vec<Box<dyn Required>>,
+    required: Vec<Paths>,
 }
 
 impl Validator {
@@ -67,8 +41,8 @@ impl Validator {
         self
     }
 
-    pub fn require(&mut self, path: impl Required + 'static) -> &mut Self {
-        self.required.push(Box::new(path));
+    pub fn require<I: Into<Paths>>(&mut self, path: I) -> &mut Self {
+        self.required.push(path.into());
         self
     }
 
@@ -83,8 +57,8 @@ impl Validator {
         let missing_fields = self
             .required
             .iter()
-            .filter(|r| data.get(r.path()).is_some())
-            .map(|r| r.name().into())
+            .filter(|r| data.get(&r.as_ref()).is_some())
+            .map(|r: &Paths| r.0.to_string())
             .collect::<Vec<String>>();
 
         let validation_errors = self

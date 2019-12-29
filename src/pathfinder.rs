@@ -1,16 +1,13 @@
 #[cfg(feature = "date_parsing")]
 use chrono::prelude::*;
 
-use yaml_rust::{
-    yaml::Array as YamlArray,
-    yaml::Hash as YamlHash,
-    Yaml
-};
+use yaml_rust::{yaml::Array as YamlArray, yaml::Hash as YamlHash, Yaml};
 
 #[cfg(feature = "date_parsing")]
 use crate::util::parse_dmy_date;
 
 pub use crate::error::{FieldError, FieldResult};
+pub use crate::path::*;
 
 /// Enables access to structured data via a simple path
 ///
@@ -24,10 +21,10 @@ pub trait PathFinder {
     ///
     /// Splits path string
     /// and replaces `Yaml::Null` and `Yaml::BadValue`.
-    fn get<'a>(&'a self, paths: &str) -> Option<&'a Yaml> {
+    fn get<'a>(&'a self, paths: &YPaths) -> Option<&'a Yaml> {
         paths
-            .split('|')
-            .filter_map(|path| self.get_direct(self.data(), path))
+            .alternatives()
+            .filter_map(|path| self.get_direct(self.data(), &path))
             .nth(0)
     }
 
@@ -35,18 +32,15 @@ pub trait PathFinder {
     ///
     /// Splits path string
     /// and replaces `Yaml::Null` and `Yaml::BadValue`.
-    fn get_direct<'a>(&'a self, data: &'a Yaml, path: &str) -> Option<&'a Yaml> {
+    fn get_direct<'a>(&'a self, data: &'a Yaml, path: &YPath) -> Option<&'a Yaml> {
         // TODO: this can be without copying
-        debug_assert!(
-            !path.chars().any(char::is_whitespace),
-            "paths shouldn't contain whitespaces {:?}",
-            path
-        );
-        let path = path
-            .split(|p| p == '/' || p == '.')
-            .filter(|k| !k.is_empty())
-            .collect::<Vec<&str>>();
-        match self.get_path(data, &path) {
+        // debug_assert!(
+        //     !path.chars().any(char::is_whitespace),
+        //     "paths shouldn't contain whitespaces {:?}",
+        //     path
+        // );
+        let elements: Vec<&str> = path.elements().collect();
+        match self.get_path(data, &elements) {
             Some(&Yaml::BadValue) | Some(&Yaml::Null) => None,
             content => content,
         }
@@ -87,11 +81,16 @@ pub trait PathFinder {
     }
 
     /// Gets the field for a given path.
-    fn field<'a, T, F>(&'a self, path: &str, err: &str, parser: F) -> FieldResult<T>
+    fn field<'a, T, F, I: Into<YPaths<'a>>>(
+        &'a self,
+        path: I,
+        err: &str,
+        parser: F,
+    ) -> FieldResult<T>
     where
         F: FnOnce(&'a Yaml) -> Option<T>,
     {
-        let res = self.get(path);
+        let res = self.get(&path.into());
         match res {
             None => Err(FieldError::Missing),
             Some(ref node) => match parser(node) {
@@ -104,27 +103,28 @@ pub trait PathFinder {
     /// Gets a `&str` value.
     ///
     /// Same mentality as `yaml_rust`, only returns `Some`, if it's a `Yaml::String`.
-    fn get_str<'a>(&'a self, path: &str) -> FieldResult<&'a str> {
+    fn get_str<'a, I: Into<YPaths<'a>>>(&'a self, path: I) -> FieldResult<&'a str> {
         self.field(path, "not a string", Yaml::as_str)
     }
 
     /// Gets a `&str` value.
     ///
     /// Same mentality as `yaml_rust`, only returns `Some`, if it's a `Yaml::String`.
-    fn get_string<'a>(&'a self, path: &str) -> FieldResult<String> {
-        self.field(path, "not a string", Yaml::as_str).map(Into::into)
+    fn get_string<'a, I: Into<YPaths<'a>>>(&'a self, path: I) -> FieldResult<String> {
+        self.field(path, "not a string", Yaml::as_str)
+            .map(Into::into)
     }
 
     /// Gets an `Int` value.
     ///
     /// Same mentality as `yaml_rust`, only returns `Some`, if it's a `Yaml::Int`.
-    fn get_int<'a>(&'a self, path: &str) -> FieldResult<i64> {
+    fn get_int<'a, I: Into<YPaths<'a>>>(&'a self, path: I) -> FieldResult<i64> {
         self.field(path, "not an integer", Yaml::as_i64)
     }
 
     /// Gets a Date in `dd.mm.YYYY` format.
     #[cfg(feature = "date_parsing")]
-    fn get_dmy(&self, path: &str) -> FieldResult<Date<Utc>> {
+    fn get_dmy<'a, I: Into<YPaths<'a>>>(&'a self, path: I) -> FieldResult<Date<Utc>> {
         self.field(path, "not a date", |x| x.as_str().and_then(parse_dmy_date))
     }
 
@@ -133,7 +133,7 @@ pub trait PathFinder {
     /// **Careful** this is a bit sweeter then ordinary `YAML1.2`,
     /// this will interpret `"yes"` and `"no"` as booleans, similar to `YAML1.1`.
     /// Actually it will interpret any string but `"yes"` als `false`.
-    fn get_bool(&self, path: &str) -> FieldResult<bool> {
+    fn get_bool<'a, I: Into<YPaths<'a>>>(&'a self, path: I) -> FieldResult<bool> {
         self.field(path, "not a boolean", |y| {
             y.as_bool()
                 // allowing it to be a str: "yes" or "no"
@@ -148,24 +148,24 @@ pub trait PathFinder {
     }
 
     /// Get as `Bool` value.
-    fn get_bool_strict(&self, path: &str) -> FieldResult<bool> {
+    fn get_bool_strict<'a, I: Into<YPaths<'a>>>(&'a self, path: I) -> FieldResult<bool> {
         self.field(path, "not a boolean", |y| y.as_bool())
     }
 
     /// Get as `Yaml::Hash`
-    fn get_hash<'a>(&'a self, path: &str) -> FieldResult<&'a YamlHash> {
+    fn get_hash<'a, I: Into<YPaths<'a>>>(&'a self, path: I) -> FieldResult<&'a YamlHash> {
         self.field(path, "not a hash", Yaml::as_hash)
     }
 
     /// Get as `Yaml::Array`
-    fn get_vec<'a>(&'a self, path: &str) -> FieldResult<&'a YamlArray> {
+    fn get_vec<'a, I: Into<YPaths<'a>>>(&'a self, path: I) -> FieldResult<&'a YamlArray> {
         self.field(path, "not a vector", Yaml::as_vec)
     }
 
     /// Gets a `Float` value.
     ///
     /// Also takes a `Yaml::I64` and reinterprets it.
-    fn get_f64(&self, path: &str) -> FieldResult<f64> {
+    fn get_f64<'a, I: Into<YPaths<'a>>>(&'a self, path: I) -> FieldResult<f64> {
         self.field(path, "not a float", |y| {
             y.as_f64().or_else(|| y.as_i64().map(|y| y as f64))
         })

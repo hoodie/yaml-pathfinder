@@ -9,6 +9,7 @@ use std::{
 };
 
 pub mod error;
+pub mod path;
 mod pathfinder;
 mod util;
 pub mod validator;

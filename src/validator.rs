@@ -12,7 +12,6 @@ where
     R: Invalidatable + Send + 'static,
 {
     type Res = R;
-
     fn call(&self, req: &Yaml) -> R {
         (self)(req)
     }
@@ -24,10 +23,38 @@ fn box_rule(rule: impl Rule) -> Box<DynRule> {
     Box::new(move |cx| Box::new(rule.call(cx)))
 }
 
+pub struct Require<'a> {
+    pub name: &'a str,
+    pub path: &'a str,
+}
+
+pub trait Required {
+    fn name(&self) -> &str;
+    fn path(&self) -> &str;
+}
+
+impl Required for &str {
+    fn name(&self) -> &str {
+        self.split('|').nth(0).unwrap()
+    }
+    fn path(&self) -> &str {
+        self
+    }
+}
+
+impl Required for Require<'_> {
+    fn name(&self) -> &str {
+        self.name
+    }
+    fn path(&self) -> &str {
+        self.path
+    }
+}
+
 #[derive(Default)]
 pub struct Validator {
     rules: Vec<Box<DynRule>>,
-    required: Vec<String>,
+    required: Vec<Box<dyn Required>>,
 }
 
 impl Validator {
@@ -35,13 +62,13 @@ impl Validator {
         Default::default()
     }
 
-    pub fn add_rule(&mut self, rule: impl Rule) -> &mut Self {
+    pub fn check(&mut self, rule: impl Rule) -> &mut Self {
         self.rules.push(box_rule(rule));
         self
     }
 
-    pub fn require(&mut self, path: &str) -> &mut Self {
-        self.required.push(path.into());
+    pub fn require(&mut self, path: impl Required + 'static) -> &mut Self {
+        self.required.push(Box::new(path));
         self
     }
 
@@ -56,8 +83,8 @@ impl Validator {
         let missing_fields = self
             .required
             .iter()
-            .filter(|path| data.get(path).is_some())
-            .map(Into::into)
+            .filter(|r| data.get(r.path()).is_some())
+            .map(|r| r.name().into())
             .collect::<Vec<String>>();
 
         let validation_errors = self
